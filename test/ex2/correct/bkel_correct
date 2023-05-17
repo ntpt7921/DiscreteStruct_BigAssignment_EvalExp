@@ -1,0 +1,10 @@
+a&b
+a&b|a
+p&q
+~p
+p|q
+r|(p&q)
+~(p&q)
+(p&~q)|r
+(p|~q)&r
+~t->t&~w|(z&(p&(w&(p|p&q)|y&z&z)<->x&(~p|z)&~y))

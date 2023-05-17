@@ -2,8 +2,8 @@
 #include <cstdlib>
 #include <string>
 
-#define TEST_ARITH
-#undef TEST_LOGIC
+#undef TEST_ARITH
+#define TEST_LOGIC
 
 int main(int argc, char *argv[])
 {
@@ -15,7 +15,8 @@ int main(int argc, char *argv[])
         helper::evaluateArithmeticExpFromFile(fileName);
 #endif
 #ifdef TEST_LOGIC
-        helper::readLogicalExp(fileName);
+        /* helper::convertLogicalExpFromFile(fileName); */
+        helper::evaluateLogicalExpFromFile(fileName);
 #endif
     }
 

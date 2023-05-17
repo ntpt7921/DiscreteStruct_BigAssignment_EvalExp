@@ -1,18 +1,23 @@
 #include "helper.h"
+#include <algorithm>
 #include <bits/stdc++.h>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <list>
 #include <ostream>
+#include <queue>
 #include <stack>
 #include <string>
 #include <tuple>
+#include <unordered_map>
 #include <utility>
 
 namespace helper
 {
 
 static const std::string whitespace = " \t\n\v\f\r";
+static const std::string paren = "()";
 
 void convertArithmeticExpFromFile(std::string fileName)
 {
@@ -82,7 +87,6 @@ namespace arithmetic
 
 static const std::string operatorChar = "+-*/^";
 static const std::string digit = "0123456789";
-static const std::string paren = "()";
 
 struct SyntaxError : public std::exception
 {
@@ -321,16 +325,6 @@ using Token = std::tuple<TokenType, Operator, std::string>;
 
 std::list<Token> InfixString2PostfixTokens(std::string infix)
 {
-    using helper::arithmetic::extractStringWithToken;
-    using helper::arithmetic::getOperatorFromString;
-    using helper::arithmetic::getTokenTypeFromString;
-    using helper::arithmetic::MultipleOutputError;
-    using helper::arithmetic::Operator;
-    using helper::arithmetic::operatorPrecedence;
-    using helper::arithmetic::SyntaxError;
-    using helper::arithmetic::TokenType;
-    using helper::arithmetic::UndefinedError;
-
     std::stack<Token> stack;
     std::list<Token> result;
     bool expectBinaryOper = false;
@@ -663,6 +657,424 @@ std::string convertToString(double val)
 
 namespace logical
 {
+
+struct SyntaxError : public std::exception
+{
+    const char *what() const throw() { return "syntax error"; }
+};
+
+struct MultipleOutputError : public std::exception
+{
+    const char *what() const throw() { return "multiple-output error"; }
+};
+
+struct UndefinedError : public std::exception
+{
+    const char *what() const throw() { return "undefined error"; }
+};
+
+enum class TokenType
+{
+    UNDEFINED,
+    EMPTY,
+    OPEN_PAREN,
+    CLOSE_PAREN,
+    OPER,
+    PROP,
+};
+
+std::ostream &operator<<(std::ostream &out, TokenType tk)
+{
+    switch (tk)
+    {
+        case TokenType::UNDEFINED:
+            out << "UNDEFINED";
+            break;
+        case TokenType::EMPTY:
+            out << "EMPTY";
+            break;
+        case TokenType::OPEN_PAREN:
+            out << "OPEN_PAREN";
+            break;
+        case TokenType::CLOSE_PAREN:
+            out << "CLOSE_PAREN";
+            break;
+        case TokenType::OPER:
+            out << "OPER";
+            break;
+        case TokenType::PROP:
+            out << "PROP";
+            break;
+        default:
+            break;
+    }
+    return out;
+}
+
+enum class Operator
+{
+    UNDEFINED,
+    AND,
+    OR,
+    NOT,
+    IMPLY,
+    EQUIV,
+};
+
+std::ostream &operator<<(std::ostream &out, Operator op)
+{
+    switch (op)
+    {
+        case Operator::UNDEFINED:
+            out << "UNDEFINED";
+            break;
+        case Operator::AND:
+            out << "AND";
+            break;
+        case Operator::OR:
+            out << "OR";
+            break;
+        case Operator::NOT:
+            out << "NOT";
+            break;
+        case Operator::IMPLY:
+            out << "IMPLY";
+            break;
+        case Operator::EQUIV:
+            out << "EQUIV";
+            break;
+        default:
+            break;
+    }
+    return out;
+}
+
+static const std::string multiCharOperator = "<->";
+static const std::string singleCharOperator = "&|~";
+
+std::string extractStringWithToken(std::string &exp)
+{
+    auto start = exp.find_first_not_of(whitespace);
+    auto getTypeFromChar = [](char c) -> int
+    {
+        if (std::isalpha(c))
+            return 0;  // proposition
+        else if (paren.find(c) != std::string::npos)
+            return 1;  // paren
+        else if (singleCharOperator.find(c) != std::string::npos)
+            return 2;  // single-char operator
+        else if (multiCharOperator.find(c) != std::string::npos)
+            return 3;  // multi-char operator
+        else
+            return 4;  // space and other stuff
+    };
+
+    int currType = getTypeFromChar(exp[start]);
+    auto end = start + 1;
+    while (end < exp.size())
+    {
+        if (exp[end] == ')' || exp[end] == '(')  // break on each paren
+            break;
+        else if (singleCharOperator.find(exp[end])
+                 != std::string::npos)  // break on single-char operator
+            break;
+        else if (getTypeFromChar(exp[end]) != currType)  // else break by differ type
+            break;
+        end++;
+    }
+
+    if (start == std::string::npos)
+    {
+        exp.clear();
+        return "";
+    }
+    else if (end == exp.size())
+    {
+        auto result = exp.substr(start);
+        exp.clear();
+        return result;
+    }
+    else
+    {
+        auto result = exp.substr(start, end - start);
+        exp.erase(0, end);
+        return result;
+    }
+}
+
+TokenType getTokenTypeFromString(const std::string &str)
+{
+    if (str.find_first_not_of(whitespace) == std::string::npos)
+        return TokenType::EMPTY;
+
+    if (str.find("(") != std::string::npos)
+        return TokenType::OPEN_PAREN;
+
+    if (str.find(")") != std::string::npos)
+        return TokenType::CLOSE_PAREN;
+
+    if (str.find_first_of(singleCharOperator) != std::string::npos)
+        return TokenType::OPER;
+
+    if (str.find_first_of(multiCharOperator) != std::string::npos)
+    {
+        if (str == "->")
+            return TokenType::OPER;
+        else if (str == "<->")
+            return TokenType::OPER;
+        else
+            throw UndefinedError();
+    }
+
+    // if every char within str is alphabetical
+    if (std::find_if_not(str.begin(), str.end(), [](char c) { return std::isalpha(c); })
+        == str.end())
+        return TokenType::PROP;
+
+    throw UndefinedError();
+}
+
+Operator getOperatorFromString(const std::string &oper)
+{
+    if (oper == "&")
+        return Operator::AND;
+    else if (oper == "|")
+        return Operator::OR;
+    else if (oper == "~")
+        return Operator::NOT;
+    else if (oper == "->")
+        return Operator::IMPLY;
+    else if (oper == "<->")
+        return Operator::EQUIV;
+    else
+        throw UndefinedError();
+}
+
+int operatorPrecedence(Operator op)
+{
+    switch (op)
+    {
+        case Operator::NOT:
+            return 4;
+
+        case Operator::AND:
+        case Operator::OR:
+            return 3;
+
+        case Operator::IMPLY:
+            return 2;
+
+        case Operator::EQUIV:
+            return 1;
+
+        default:
+            return -1;
+    }
+}
+
+using Token = std::tuple<TokenType, Operator, std::string>;
+
+std::list<Token> InfixString2PostfixTokens(std::string infix)
+{
+    std::stack<Token> stack;
+    std::list<Token> result;
+    bool expectProp = false;
+    bool expectBinaryOper = false;
+
+    while (!infix.empty())
+    {
+        std::string token;
+        token = extractStringWithToken(infix);
+
+        // NOTE: Debug print
+        /* std::cerr << token << '\n'; */
+
+        switch (getTokenTypeFromString(token))
+        {
+            case TokenType::UNDEFINED:
+                throw UndefinedError();
+
+            case TokenType::EMPTY:
+                break;
+
+            case TokenType::OPEN_PAREN:
+                stack.push(Token(TokenType::OPEN_PAREN, Operator::UNDEFINED, token));
+                break;
+
+            case TokenType::CLOSE_PAREN:
+                if (stack.empty())
+                    throw SyntaxError();
+
+                while (std::get<TokenType>(stack.top()) != TokenType::OPEN_PAREN)
+                {
+                    result.push_back(stack.top());
+                    stack.pop();
+
+                    if (stack.empty())
+                        throw SyntaxError();
+                }
+                stack.pop();
+                break;
+
+            case TokenType::OPER:
+            {
+                Operator oper = getOperatorFromString(token);
+
+                // no consecutive operator
+                if (expectBinaryOper && oper == Operator::NOT)
+                    throw UndefinedError();
+                if (expectProp && oper != Operator::NOT)
+                    throw UndefinedError();
+
+                if (oper != Operator::NOT)
+                {
+                    expectProp = true;
+                    expectBinaryOper = false;
+                }
+
+                auto currPrecedence = operatorPrecedence(oper);
+                // if curr oper is unary
+                if (oper == Operator::NOT && !stack.empty()
+                    && std::get<Operator>(stack.top()) == Operator::NOT)
+                {
+                    stack.push(Token(TokenType::OPER, oper, token));
+                }
+                else
+                {
+                    while (!stack.empty()
+                           && currPrecedence <= operatorPrecedence(std::get<Operator>(stack.top())))
+                    {
+                        result.push_back(stack.top());
+                        stack.pop();
+                    }
+                    stack.push(Token(TokenType::OPER, oper, token));
+                }
+            }
+            break;
+
+            case TokenType::PROP:
+                if (expectBinaryOper)
+                    throw SyntaxError();
+
+                result.push_back(Token(TokenType::PROP, Operator::UNDEFINED, token));
+                expectProp = false;
+                expectBinaryOper = true;
+                break;
+
+            default:
+                throw UndefinedError();
+        }
+    }
+
+    while (!stack.empty())
+    {
+        if (std::get<TokenType>(stack.top()) == TokenType::OPEN_PAREN)
+            throw SyntaxError();
+
+        result.push_back(stack.top());
+        stack.pop();
+    }
+
+    return result;
+}
+
+std::string PostfixTokens2PrefixString(const std::list<Token> &postfixTokens)
+{
+    std::stack<std::string> result;
+
+    for (const Token &token : postfixTokens)
+    {
+        /* // NOTE: Debug print */
+        /* std::cerr << std::get<std::string>(token) << '\t' << std::get<TokenType>(token) << '\t' */
+        /*           << std::get<Operator>(token) << '\n'; */
+
+        switch (std::get<TokenType>(token))
+        {
+
+            case TokenType::PROP:
+                result.push(std::get<std::string>(token));
+                break;
+
+            case TokenType::OPER:
+            {
+                switch (std::get<Operator>(token))
+                {
+                    // unary
+                    case Operator::NOT:
+                    {
+                        std::string op = result.top();
+                        result.pop();
+                        result.push(std::get<std::string>(token) + op);
+                    }
+                    break;
+
+                    // binary
+                    case Operator::AND:
+                    case Operator::OR:
+                    case Operator::IMPLY:
+                    case Operator::EQUIV:
+                    {
+                        std::string op1 = result.top();
+                        result.pop();
+                        std::string op2 = result.top();
+                        result.pop();
+                        result.push(std::get<std::string>(token) + op2 + op1);
+                    }
+                    break;
+
+                    default:
+                        throw UndefinedError();
+                }
+            }
+            break;
+
+            default:
+                throw UndefinedError();
+        }
+    }
+
+    return result.top();
+}
+
+using PropValue = std::unordered_map<std::string, bool>;
+
+PropValue readPropValue(std::string varlue)
+{
+    PropValue result;
+    std::queue<std::string> propName;
+
+    // extract prop name
+    while (!varlue.empty())
+    {
+        std::string token = extractStringWithToken(varlue);
+        if (std::find_if_not(varlue.begin(), varlue.end(), [](char c) { return std::isalpha(c); })
+            == varlue.end())
+            propName.push(token);
+        else
+            break;
+    }
+
+    // extract prop value
+    while (!varlue.empty())
+    {
+        // use extract function from helper::arithmetic to extract number
+        std::string token = helper::arithmetic::extractStringWithToken(varlue);
+        if (std::find_if_not(varlue.begin(), varlue.end(), [](char c) { return std::isdigit(c); })
+            == varlue.end())
+        {
+            result[propName.front()] = static_cast<bool>(std::stoi(token));
+            propName.pop();
+        }
+        else
+            throw;
+    }
+
+    if (!propName.empty())
+        throw;
+
+    return result;
+}
+
 };  // namespace logical
 
 };  // namespace helper
@@ -758,16 +1170,61 @@ std::string PostfixPrefixCalculator(std::string input)
 
 std::string LogicInfix2Postfix(std::string infix)
 {
-    (void) infix;
-    return "";
-    return "";
+    using helper::logical::MultipleOutputError;
+    using helper::logical::SyntaxError;
+    using helper::logical::Token;
+    using helper::logical::UndefinedError;
+
+    std::string result;
+    try
+    {
+        std::list<Token> tokens = helper::logical::InfixString2PostfixTokens(infix);
+        for (const Token &token : tokens)
+            result += std::get<std::string>(token);
+    }
+    catch (const MultipleOutputError &err)
+    {
+        result = err.what();
+    }
+    catch (const SyntaxError &err)
+    {
+        result = err.what();
+    }
+    catch (const UndefinedError &err)
+    {
+        result = err.what();
+    }
+
+    return result;
 }
 
 std::string LogicInfix2Prefix(std::string infix)
 {
-    (void) infix;
-    return "";
-    return "";
+    using helper::logical::MultipleOutputError;
+    using helper::logical::SyntaxError;
+    using helper::logical::Token;
+    using helper::logical::UndefinedError;
+
+    std::string result;
+    try
+    {
+        result = helper::logical::PostfixTokens2PrefixString(
+            helper::logical::InfixString2PostfixTokens(infix));
+    }
+    catch (const MultipleOutputError &err)
+    {
+        result = err.what();
+    }
+    catch (const SyntaxError &err)
+    {
+        result = err.what();
+    }
+    catch (const UndefinedError &err)
+    {
+        result = err.what();
+    }
+
+    return result;
 }
 
 std::string LogicPostfixPrefixCalculator(std::string input, std::string varlue)

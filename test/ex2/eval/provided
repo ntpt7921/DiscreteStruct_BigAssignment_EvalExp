@@ -1,0 +1,40 @@
+ab&
+a b 1 0
+&ab
+a b 1 0
+ab&a|
+a b 1 0
+|&aba
+a b 1 0
+pq&
+p q 0 1
+&pq
+p q 0 1
+p~
+p 1
+~p
+p 1
+pq|
+p q 1 0
+|pq
+p q 1 0
+rpq&|
+p q r 1 0 1
+|r&pq
+p q r 1 0 1
+pq&~
+p q 1 1
+~&pq
+p q 1 1
+pq~&r|
+p q r 1 0 0
+|&p~qr
+p q r 1 0 0
+pq~|r&
+p q r 0 0 1
+&|p~qr
+p q r 0 0 1
+t~tw~&zpwpp|q&&y|z&z&&xp~z|&y~&<->&|->
+t w z p q y x 1 1 1 1 1 1 1
+->~t|&t~w&z<->&p&&|&w&|ppqyzz&&x|~pz~y
+t w z p q y x 1 1 1 1 1 1 1

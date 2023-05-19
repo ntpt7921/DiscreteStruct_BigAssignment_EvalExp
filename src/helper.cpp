@@ -1,9 +1,11 @@
 #include "helper.h"
 #include <algorithm>
-#include <bits/stdc++.h>
 #include <cctype>
 #include <cmath>
+#include <cstddef>
 #include <cstdio>
+#include <fstream>
+#include <iostream>
 #include <list>
 #include <ostream>
 #include <queue>
@@ -12,6 +14,24 @@
 #include <tuple>
 #include <unordered_map>
 #include <utility>
+
+namespace helper
+{
+
+void convertArithmeticExpFromFile(std::string fileName);
+void convertLogicalExpFromFile(std::string fileName);
+void evaluateArithmeticExpFromFile(std::string fileName);
+void evaluateLogicalExpFromFile(std::string fileName);
+
+};  // namespace helper
+
+std::string Infix2Postfix(std::string infix);
+std::string Infix2Prefix(std::string infix);
+std::string PostfixPrefixCalculator(std::string input);
+
+std::string LogicInfix2Postfix(std::string infix);
+std::string LogicInfix2Prefix(std::string infix);
+std::string LogicPostfixPrefixCalculator(std::string input, std::string varlue);
 
 namespace helper
 {
@@ -75,10 +95,25 @@ void evaluateLogicalExpFromFile(std::string fileName)
     std::string exp;
     while (std::getline(file, exp))
     {
+        std::string propValue;
+        if (!std::getline(file, propValue))
+            break;
+
         std::cout << exp << '\n';
-        // TODO: fix this
-        std::cout << "Result: " << LogicPostfixPrefixCalculator(exp, "") << '\n';
+        std::cout << propValue << '\n';
+        std::cout << "Result: " << LogicPostfixPrefixCalculator(exp, propValue) << '\n';
         std::cout << "~~~~~~~~" << std::endl;
+    }
+}
+
+void cleanLinebreak(std::string &line)
+{
+    static const std::string lineBreak = "\n\r";
+    auto foundAt = line.find_first_of(lineBreak);
+    while (foundAt != std::string::npos)
+    {
+        line.erase(foundAt, 1);
+        foundAt = line.find_first_of(lineBreak, foundAt);
     }
 }
 
@@ -161,6 +196,12 @@ std::string extractStringWithToken(std::string &exp)
             return 3;  // space and other stuff
     };
 
+    if (start == std::string::npos)
+    {
+        exp.clear();
+        return "";
+    }
+
     int currType = getTypeFromChar(exp[start]);
     auto end = start + 1;
     while (end < exp.size())
@@ -174,12 +215,7 @@ std::string extractStringWithToken(std::string &exp)
         end++;
     }
 
-    if (start == std::string::npos)
-    {
-        exp.clear();
-        return "";
-    }
-    else if (end == exp.size())
+    if (end == exp.size())
     {
         auto result = exp.substr(start);
         exp.clear();
@@ -681,6 +717,7 @@ enum class TokenType
     CLOSE_PAREN,
     OPER,
     PROP,
+    VALUE,
 };
 
 std::ostream &operator<<(std::ostream &out, TokenType tk)
@@ -704,6 +741,9 @@ std::ostream &operator<<(std::ostream &out, TokenType tk)
             break;
         case TokenType::PROP:
             out << "PROP";
+            break;
+        case TokenType::VALUE:
+            out << "VALUE";
             break;
         default:
             break;
@@ -765,9 +805,17 @@ std::string extractStringWithToken(std::string &exp)
             return 2;  // single-char operator
         else if (multiCharOperator.find(c) != std::string::npos)
             return 3;  // multi-char operator
+        else if (std::isdigit(c))
+            return 4;  // is value
         else
-            return 4;  // space and other stuff
+            return 5;  // space and other stuff
     };
+
+    if (start == std::string::npos)
+    {
+        exp.clear();
+        return "";
+    }
 
     int currType = getTypeFromChar(exp[start]);
     auto end = start + 1;
@@ -778,17 +826,14 @@ std::string extractStringWithToken(std::string &exp)
         else if (singleCharOperator.find(exp[end])
                  != std::string::npos)  // break on single-char operator
             break;
+        else if (std::isalpha(exp[end]))  // break on siggle-char prop
+            break;
         else if (getTypeFromChar(exp[end]) != currType)  // else break by differ type
             break;
         end++;
     }
 
-    if (start == std::string::npos)
-    {
-        exp.clear();
-        return "";
-    }
-    else if (end == exp.size())
+    if (end == exp.size())
     {
         auto result = exp.substr(start);
         exp.clear();
@@ -830,6 +875,10 @@ TokenType getTokenTypeFromString(const std::string &str)
     if (std::find_if_not(str.begin(), str.end(), [](char c) { return std::isalpha(c); })
         == str.end())
         return TokenType::PROP;
+
+    if (std::find_if_not(str.begin(), str.end(), [](char c) { return std::isdigit(c); })
+        == str.end())
+        return TokenType::VALUE;
 
     throw UndefinedError();
 }
@@ -1047,26 +1096,20 @@ PropValue readPropValue(std::string varlue)
     while (!varlue.empty())
     {
         std::string token = extractStringWithToken(varlue);
-        if (std::find_if_not(varlue.begin(), varlue.end(), [](char c) { return std::isalpha(c); })
-            == varlue.end())
-            propName.push(token);
-        else
-            break;
-    }
-
-    // extract prop value
-    while (!varlue.empty())
-    {
-        // use extract function from helper::arithmetic to extract number
-        std::string token = helper::arithmetic::extractStringWithToken(varlue);
-        if (std::find_if_not(varlue.begin(), varlue.end(), [](char c) { return std::isdigit(c); })
-            == varlue.end())
+        switch (getTokenTypeFromString(token))
         {
-            result[propName.front()] = static_cast<bool>(std::stoi(token));
-            propName.pop();
+            case TokenType::PROP:
+                propName.push(token);
+                break;
+
+            case TokenType::VALUE:
+                result.insert({propName.front(), static_cast<bool>(std::stoi(token))});
+                propName.pop();
+                break;
+
+            default:
+                throw UndefinedError();
         }
-        else
-            throw;
     }
 
     if (!propName.empty())
@@ -1075,8 +1118,160 @@ PropValue readPropValue(std::string varlue)
     return result;
 }
 
-};  // namespace logical
+bool isPostfix(std::string &exp)
+{
+    while (!exp.empty())
+    {
+        std::string token = extractStringWithToken(exp);
+        switch (getTokenTypeFromString(token))
+        {
+            case TokenType::EMPTY:
+                continue;
+                break;
+            case TokenType::PROP:
+                exp = token + " " + exp;
+                return true;
+            case TokenType::OPER:
+                exp = token + " " + exp;
+                return false;
+            default:
+                throw UndefinedError();
+        }
+    }
 
+    throw UndefinedError();
+}
+
+bool isPrefix(std::string &exp)
+{
+    while (!exp.empty())
+    {
+        std::string token = extractStringWithToken(exp);
+        switch (getTokenTypeFromString(token))
+        {
+            case TokenType::EMPTY:
+                continue;
+                break;
+            case TokenType::PROP:
+                exp = token + " " + exp;
+                return false;
+            case TokenType::OPER:
+                exp = token + " " + exp;
+                return true;
+            default:
+                throw UndefinedError();
+        }
+    }
+
+    throw UndefinedError();
+}
+
+bool evalulatePostfix(std::string postfix, const PropValue &propValue, bool reverse = false)
+{
+    std::stack<bool> stack;
+
+    while (!postfix.empty())
+    {
+        std::string token = extractStringWithToken(postfix);
+
+        // NOTE: Debug print
+        /* std::cerr << token << '\n'; */
+
+        switch (getTokenTypeFromString(token))
+        {
+            case TokenType::EMPTY:
+                continue;
+            case TokenType::PROP:
+            {
+                auto value = propValue.find(token);
+                if (value != propValue.end())
+                    stack.push(value->second);
+                else
+                    throw UndefinedError();
+            }
+            break;
+            case TokenType::OPER:
+            {
+                bool op1, op2;
+                switch (getOperatorFromString(token))
+                {
+                    case Operator::NOT:
+                        op1 = stack.top();
+                        stack.pop();
+                        stack.push(!op1);
+                        break;
+                    case Operator::AND:
+                        op2 = stack.top();
+                        stack.pop();
+                        op1 = stack.top();
+                        stack.pop();
+                        stack.push(op1 && op2);
+                        break;
+                    case Operator::OR:
+                        op2 = stack.top();
+                        stack.pop();
+                        op1 = stack.top();
+                        stack.pop();
+                        stack.push(op1 || op2);
+                        break;
+                    case Operator::IMPLY:
+                        op2 = stack.top();
+                        stack.pop();
+                        op1 = stack.top();
+                        stack.pop();
+                        if (!reverse)
+                            stack.push(!op1 || op2);
+                        else
+                            stack.push(!op2 || op1);
+                        break;
+                    case Operator::EQUIV:
+                        op2 = stack.top();
+                        stack.pop();
+                        op1 = stack.top();
+                        stack.pop();
+                        stack.push(op2 == op1);
+                        break;
+                    default:
+                        throw UndefinedError();
+                }
+            }
+            break;
+
+            default:
+                throw UndefinedError();
+        }
+    }
+
+    return stack.top();
+}
+
+double evalulatePrefix(std::string prefix, const PropValue &propValue)
+{
+    std::list<std::string> tokens;
+    while (!prefix.empty())
+    {
+        std::string token = extractStringWithToken(prefix);
+        switch (getTokenTypeFromString(token))
+        {
+            case TokenType::EMPTY:
+                continue;
+            case TokenType::PROP:
+            case TokenType::OPER:
+                tokens.push_back(token);
+                break;
+            default:
+                throw UndefinedError();
+        }
+    }
+
+    std::string postfix;
+    for (auto iter = tokens.rbegin(), end = tokens.rend(); iter != end; iter++)
+        postfix += *iter + " ";
+
+    return evalulatePostfix(postfix, propValue, true);  // eval with reverse operand
+}
+
+};  // namespace logical
 };  // namespace helper
 
 std::string Infix2Postfix(std::string infix)
@@ -1085,6 +1280,8 @@ std::string Infix2Postfix(std::string infix)
     using helper::arithmetic::SyntaxError;
     using helper::arithmetic::Token;
     using helper::arithmetic::UndefinedError;
+
+    helper::cleanLinebreak(infix);
 
     std::string result;
     try
@@ -1116,6 +1313,8 @@ std::string Infix2Prefix(std::string infix)
     using helper::arithmetic::Token;
     using helper::arithmetic::UndefinedError;
 
+    helper::cleanLinebreak(infix);
+
     std::string result;
     try
     {
@@ -1142,6 +1341,8 @@ std::string PostfixPrefixCalculator(std::string input)
 {
     using helper::arithmetic::DivideByZeroError;
     using helper::arithmetic::UndefinedError;
+
+    helper::cleanLinebreak(input);
 
     std::string result;
     try
@@ -1175,6 +1376,8 @@ std::string LogicInfix2Postfix(std::string infix)
     using helper::logical::Token;
     using helper::logical::UndefinedError;
 
+    helper::cleanLinebreak(infix);
+
     std::string result;
     try
     {
@@ -1205,6 +1408,8 @@ std::string LogicInfix2Prefix(std::string infix)
     using helper::logical::Token;
     using helper::logical::UndefinedError;
 
+    helper::cleanLinebreak(infix);
+
     std::string result;
     try
     {
@@ -1229,8 +1434,31 @@ std::string LogicInfix2Prefix(std::string infix)
 
 std::string LogicPostfixPrefixCalculator(std::string input, std::string varlue)
 {
-    (void) input;
-    (void) varlue;
-    return "";
-    return "";
+    using helper::logical::PropValue;
+    using helper::logical::UndefinedError;
+
+    helper::cleanLinebreak(input);
+    helper::cleanLinebreak(varlue);
+
+    std::string result;
+    try
+    {
+        bool res;
+        PropValue propValue = helper::logical::readPropValue(varlue);
+
+        if (helper::logical::isPostfix(input))
+            res = helper::logical::evalulatePostfix(input, propValue);
+        else if (helper::logical::isPrefix(input))
+            res = helper::logical::evalulatePrefix(input, propValue);
+        else
+            throw UndefinedError();
+
+        return (res) ? "TRUE" : "FALSE";
+    }
+    catch (const UndefinedError &err)
+    {
+        result = err.what();
+    }
+
+    return result;
 }

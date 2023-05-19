@@ -15,8 +15,8 @@ int main(int argc, char *argv[])
         helper::evaluateArithmeticExpFromFile(fileName);
 #endif
 #ifdef TEST_LOGIC
-        /* helper::convertLogicalExpFromFile(fileName); */
-        helper::evaluateLogicalExpFromFile(fileName);
+        helper::convertLogicalExpFromFile(fileName);
+        /* helper::evaluateLogicalExpFromFile(fileName); */
 #endif
     }
 
